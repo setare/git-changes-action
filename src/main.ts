@@ -31,7 +31,7 @@ async function run(): Promise<void> {
         }
       }
     )
-    if (exitCode == 0) {
+    if (exitCode === 0) {
       octokit.rest.checks.update({
         ...ctx.repo,
         check_run_id: check.data.id,
