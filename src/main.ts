@@ -23,7 +23,7 @@ async function run(): Promise<void> {
       status: 'in_progress'
     })
 
-    console.log('check:', check.data, check)
+    console.log('check:', check.data)
 
     try {
       const {exitCode, files} = await diffIndex()
@@ -62,7 +62,7 @@ ${
     } catch (e) {
       process.exitCode = 1
       console.error(e)
-      octokit.rest.checks.update({
+      await octokit.rest.checks.update({
         ...ctx.repo,
         check_run_id: check.data.id,
         conclusion: 'failure',
