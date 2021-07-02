@@ -1,4 +1,4 @@
-import {exec} from '@actions/exec'
+import { exec } from '@actions/exec'
 
 export const splitFileNames = (str: string): string[] => {
   return str.split('\n').map(s =>
@@ -19,12 +19,14 @@ export async function diffIndex(): Promise<DiffIndexResponse> {
   let diffIndexOutput = ''
 
   const exitCode = await exec('git', ['diff-index', '--quiet', 'HEAD', '--'], {
+    ignoreReturnCode: true,
     listeners: {
       stdout: (data: Buffer) => {
         diffIndexOutput += data.toString()
       }
     }
   })
+
 
   if (exitCode === 0) {
     return {
