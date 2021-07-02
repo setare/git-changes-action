@@ -1,10 +1,7 @@
-import { exec } from '@actions/exec'
+import {exec} from '@actions/exec'
 
 export const splitFileNames = (lines: string[]): string[] => {
-  return lines.map(s =>
-    s
-      .split('\t')[1]
-  )
+  return lines.map(s => s.split('\t')[1])
 }
 
 interface DiffIndexResponse {
@@ -12,20 +9,20 @@ interface DiffIndexResponse {
 }
 
 export async function diffIndex(): Promise<DiffIndexResponse> {
-  const rawLines: string[] = [];
+  const rawLines: string[] = []
 
   await exec('git', ['diff-index', 'HEAD', '--'], {
     listeners: {
-      stdline: (data) => {
-        rawLines.push(data);
+      stdline: data => {
+        rawLines.push(data)
       },
-      errline: (data) => {
-        rawLines.push(data);
+      errline: data => {
+        rawLines.push(data)
       }
     }
   })
 
-  console.log(rawLines);
+  console.log(rawLines)
   const files = splitFileNames(rawLines)
 
   return {

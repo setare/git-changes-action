@@ -26,12 +26,11 @@ async function run(): Promise<void> {
     console.log('check:', check.data)
 
     try {
-      const {exitCode, files} = await diffIndex()
+      const {files} = await diffIndex()
       console.log('diffIndex result', {
-        exitCode,
         files
       })
-      if (exitCode === 0) {
+      if (files?.length === 0) {
         await octokit.rest.checks.update({
           ...ctx.repo,
           check_run_id: check.data.id,

@@ -19,32 +19,27 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.diffIndex = exports.splitFileNames = void 0;
 const exec_1 = __webpack_require__(1514);
-const splitFileNames = (str) => {
-    return str.split('\n').map(s => s
-        .trim()
-        .split(/ +/)
-        .filter((_, idx) => idx > 4)
-        .join(' '));
+const splitFileNames = (lines) => {
+    return lines.map(s => s
+        .split('\t')[1]);
 };
 exports.splitFileNames = splitFileNames;
 function diffIndex() {
     return __awaiter(this, void 0, void 0, function* () {
-        let diffIndexOutput = '';
-        const exitCode = yield exec_1.exec('git', ['diff-index', '--quiet', 'HEAD', '--'], {
+        const rawLines = [];
+        yield exec_1.exec('git', ['diff-index', 'HEAD', '--'], {
             listeners: {
-                stdout: (data) => {
-                    diffIndexOutput += data.toString();
+                stdline: (data) => {
+                    rawLines.push(data);
+                },
+                errline: (data) => {
+                    rawLines.push(data);
                 }
             }
         });
-        if (exitCode === 0) {
-            return {
-                exitCode
-            };
-        }
-        const files = exports.splitFileNames(diffIndexOutput);
+        console.log(rawLines);
+        const files = exports.splitFileNames(rawLines);
         return {
-            exitCode,
             files
         };
     });
@@ -103,14 +98,13 @@ function run() {
             });
             console.log('octokit initialized');
             const check = yield octokit.rest.checks.create(Object.assign(Object.assign({}, ctx.repo), { head_sha: ctx.sha, name: 'git-changes', status: 'in_progress' }));
-            console.log('check:', check.data, check);
+            console.log('check:', check.data);
             try {
-                const { exitCode, files } = yield git_1.diffIndex();
+                const { files } = yield git_1.diffIndex();
                 console.log('diffIndex result', {
-                    exitCode,
-                    files,
+                    files
                 });
-                if (exitCode === 0) {
+                if ((files === null || files === void 0 ? void 0 : files.length) === 0) {
                     yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'success', output: {
                             title: 'No changes were found',
                             summary: 'The repository has no uncommitted changes.'
@@ -129,7 +123,7 @@ ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
             catch (e) {
                 process.exitCode = 1;
                 console.error(e);
-                octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
                         title: 'Check failed',
                         summary: 'An error occurred when running the action.',
                         text: `
