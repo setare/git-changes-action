@@ -1,43 +1,34 @@
 import { exec } from '@actions/exec'
 
-export const splitFileNames = (str: string): string[] => {
-  return str.split('\n').map(s =>
+export const splitFileNames = (lines: string[]): string[] => {
+  return lines.map(s =>
     s
-      .trim()
-      .split(/ +/)
-      .filter((_, idx) => idx > 4)
-      .join(' ')
+      .split('\t')[1]
   )
 }
 
 interface DiffIndexResponse {
-  exitCode: number
   files?: string[]
 }
 
 export async function diffIndex(): Promise<DiffIndexResponse> {
-  let diffIndexOutput = ''
+  const rawLines: string[] = [];
 
-  const exitCode = await exec('git', ['diff-index', '--quiet', 'HEAD', '--'], {
-    ignoreReturnCode: true,
+  await exec('git', ['diff-index', 'HEAD', '--'], {
     listeners: {
-      stdout: (data: Buffer) => {
-        diffIndexOutput += data.toString()
+      stdline: (data) => {
+        rawLines.push(data);
+      },
+      errline: (data) => {
+        rawLines.push(data);
       }
     }
   })
 
-
-  if (exitCode === 0) {
-    return {
-      exitCode
-    }
-  }
-
-  const files = splitFileNames(diffIndexOutput)
+  console.log(rawLines);
+  const files = splitFileNames(rawLines)
 
   return {
-    exitCode,
     files
   }
 }
