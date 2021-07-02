@@ -14,65 +14,53 @@ async function run(): Promise<void> {
     const octokit = new Octokit({
       auth: token
     })
-    console.log('octokit initialized')
 
-    const check = await octokit.rest.checks.create({
+    const commitStatusProps = {
       ...ctx.repo,
-      head_sha: ctx.sha,
-      name: 'git-changes',
-      status: 'in_progress'
-    })
+      sha: ctx.sha
+    }
 
-    console.log('check:', check.data)
+    await octokit.rest.repos.createCommitStatus({
+      ...commitStatusProps,
+      state: 'pending'
+    })
 
     try {
       const {files} = await diffIndex()
-      console.log('diffIndex result', {
-        files
-      })
+
       if (files?.length === 0) {
-        await octokit.rest.checks.update({
-          ...ctx.repo,
-          check_run_id: check.data.id,
-          conclusion: 'success',
-          output: {
-            title: 'No changes were found',
-            summary: 'The repository has no uncommitted changes.'
-          }
+        await octokit.rest.repos.createCommitStatus({
+          ...commitStatusProps,
+          state: 'success',
+          description: `No changes were found.`
         })
         return
       }
 
-      await octokit.rest.checks.update({
-        ...ctx.repo,
-        check_run_id: check.data.id,
-        conclusion: 'failure',
-        output: {
-          title: 'Uncommitted changes were found',
-          summary: `${(files ?? []).length} uncommitted files were found`,
-          text: `### Files
+      await octokit.rest.repos.createCommitStatus({
+        ...commitStatusProps,
+        state: 'failure',
+        description: `${(files ?? []).length} uncommitted files were found
+
+### Files
 ${
   (files && files.length && files.map(f => `- ${f}`).join('\n')) ||
   '- No files found'
 }
 `
-        }
       })
     } catch (e) {
       process.exitCode = 1
       console.error(e)
-      await octokit.rest.checks.update({
-        ...ctx.repo,
-        check_run_id: check.data.id,
-        conclusion: 'failure',
-        output: {
-          title: 'Check failed',
-          summary: 'An error occurred when running the action.',
-          text: `
-          ## Exception
-          ${e}
-          `
-        }
+      await octokit.rest.repos.createCommitStatus({
+        ...commitStatusProps,
+        state: 'failure',
+        description: `An error happened when trying to detected uncommitted files.
+
+\`\`\`
+${e}
+\`\`\`
+`
       })
     }
   } catch (e: any) {
