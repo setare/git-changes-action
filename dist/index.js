@@ -92,6 +92,7 @@ function run() {
         const token = core.getInput(INPUT_GITHUB_TOKEN);
         const ctx = github.context;
         try {
+            console.log('ctx', ctx);
             const octokit = new octokit_1.Octokit({
                 auth: token
             });
@@ -106,7 +107,7 @@ function run() {
                     console.log('update files length 0 result', r);
                     return;
                 }
-                const r = yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
                         title: 'Uncommitted changes were found',
                         summary: `${(files !== null && files !== void 0 ? files : []).length} uncommitted files were found`,
                         text: `### Files
@@ -114,7 +115,13 @@ ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
                             '- No files found'}
 `
                     } }));
-                console.log('update files length != 0 result', r);
+                console.log('Uncommited files found:');
+                if (files && files.length) {
+                    for (const f of files) {
+                        console.log(`- ${f}`);
+                    }
+                }
+                process.exitCode = 1;
             }
             catch (e) {
                 process.exitCode = 1;

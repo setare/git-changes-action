@@ -11,6 +11,7 @@ async function run(): Promise<void> {
   const ctx = github.context
 
   try {
+    console.log('ctx', ctx)
     const octokit = new Octokit({
       auth: token
     })
@@ -38,7 +39,7 @@ async function run(): Promise<void> {
         return
       }
 
-      const r = await octokit.rest.checks.update({
+      await octokit.rest.checks.update({
         ...ctx.repo,
         check_run_id: check.data.id,
         conclusion: 'failure',
@@ -53,7 +54,13 @@ ${
 `
         }
       })
-      console.log('update files length != 0 result', r)
+      console.log('Uncommited files found:')
+      if (files && files.length) {
+        for (const f of files) {
+          console.log(`- ${f}`)
+        }
+      }
+      process.exitCode = 1
     } catch (e) {
       process.exitCode = 1
       console.error(e)
