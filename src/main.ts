@@ -15,53 +15,60 @@ async function run(): Promise<void> {
       auth: token
     })
 
-    const commitStatusProps = {
+    const check = await octokit.rest.checks.create({
       ...ctx.repo,
-      sha: ctx.sha
-    }
-
-    await octokit.rest.repos.createCommitStatus({
-      ...commitStatusProps,
-      state: 'pending'
+      head_sha: ctx.sha,
+      name: 'git-changes',
+      status: 'in_progress'
     })
 
     try {
       const {files} = await diffIndex()
-
       if (files?.length === 0) {
-        await octokit.rest.repos.createCommitStatus({
-          ...commitStatusProps,
-          state: 'success',
-          description: `No changes were found.`
+        await octokit.rest.checks.update({
+          ...ctx.repo,
+          check_run_id: check.data.id,
+          conclusion: 'success',
+          output: {
+            title: 'No changes were found',
+            summary: 'The repository has no uncommitted changes.'
+          }
         })
         return
       }
 
-      await octokit.rest.repos.createCommitStatus({
-        ...commitStatusProps,
-        state: 'failure',
-        description: `${(files ?? []).length} uncommitted files were found
-
-### Files
+      await octokit.rest.checks.update({
+        ...ctx.repo,
+        check_run_id: check.data.id,
+        conclusion: 'failure',
+        output: {
+          title: 'Uncommitted changes were found',
+          summary: `${(files ?? []).length} uncommitted files were found`,
+          text: `### Files
 ${
   (files && files.length && files.map(f => `- ${f}`).join('\n')) ||
   '- No files found'
 }
 `
+        }
       })
     } catch (e) {
       process.exitCode = 1
       console.error(e)
-      await octokit.rest.repos.createCommitStatus({
-        ...commitStatusProps,
-        state: 'failure',
-        description: `An error happened when trying to detected uncommitted files.
-
-\`\`\`
-${e}
-\`\`\`
-`
+      await octokit.rest.checks.update({
+        ...ctx.repo,
+        check_run_id: check.data.id,
+        conclusion: 'failure',
+        output: {
+          title: 'Check failed',
+          summary: 'An error occurred when running the action.',
+          text: `
+          ## Exception
+          ${e}
+          `
+        }
       })
+      process.exitCode = 1
     }
   } catch (e: any) {
     process.exitCode = 1

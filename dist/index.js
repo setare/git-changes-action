@@ -95,30 +95,37 @@ function run() {
             const octokit = new octokit_1.Octokit({
                 auth: token
             });
-            const commitStatusProps = Object.assign(Object.assign({}, ctx.repo), { sha: ctx.sha });
-            yield octokit.rest.repos.createCommitStatus(Object.assign(Object.assign({}, commitStatusProps), { state: 'pending' }));
+            const check = yield octokit.rest.checks.create(Object.assign(Object.assign({}, ctx.repo), { head_sha: ctx.sha, name: 'git-changes', status: 'in_progress' }));
             try {
                 const { files } = yield git_1.diffIndex();
                 if ((files === null || files === void 0 ? void 0 : files.length) === 0) {
-                    yield octokit.rest.repos.createCommitStatus(Object.assign(Object.assign({}, commitStatusProps), { state: 'success', description: `No changes were found.` }));
+                    yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'success', output: {
+                            title: 'No changes were found',
+                            summary: 'The repository has no uncommitted changes.'
+                        } }));
                     return;
                 }
-                yield octokit.rest.repos.createCommitStatus(Object.assign(Object.assign({}, commitStatusProps), { state: 'failure', description: `${(files !== null && files !== void 0 ? files : []).length} uncommitted files were found
-
-### Files
+                yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                        title: 'Uncommitted changes were found',
+                        summary: `${(files !== null && files !== void 0 ? files : []).length} uncommitted files were found`,
+                        text: `### Files
 ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
-                        '- No files found'}
-` }));
+                            '- No files found'}
+`
+                    } }));
             }
             catch (e) {
                 process.exitCode = 1;
                 console.error(e);
-                yield octokit.rest.repos.createCommitStatus(Object.assign(Object.assign({}, commitStatusProps), { state: 'failure', description: `An error happened when trying to detected uncommitted files.
-
-\`\`\`
-${e}
-\`\`\`
-` }));
+                yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                        title: 'Check failed',
+                        summary: 'An error occurred when running the action.',
+                        text: `
+          ## Exception
+          ${e}
+          `
+                    } }));
+                process.exitCode = 1;
             }
         }
         catch (e) {
