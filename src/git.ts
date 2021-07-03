@@ -22,7 +22,6 @@ export async function diffIndex(): Promise<DiffIndexResponse> {
     }
   })
 
-  console.log(rawLines)
   const files = splitFileNames(rawLines)
 
   return {

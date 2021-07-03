@@ -3,63 +3,87 @@ import * as github from '@actions/github'
 import {Octokit} from 'octokit'
 import {diffIndex} from './git'
 
-const INPUT_GITHUB_TOKEN = 'github_token'
+const DEFAULT_CHECK_NAME = 'git-changes'
+
+const INPUT_GITHUB_TOKEN = 'github_token',
+  INPUT_DISABLE_CHECK = 'disable_check',
+  INPUT_NAME = 'name'
+
+const callIfDisabled = async <T>(
+  enabled: boolean,
+  f: () => T
+): Promise<T | undefined> => {
+  if (!enabled) {
+    return f()
+  }
+  return undefined
+}
 
 async function run(): Promise<void> {
-  const token = core.getInput(INPUT_GITHUB_TOKEN)
+  const disableCheck = core.getInput(INPUT_DISABLE_CHECK) === 'true'
+  const token = core.getInput(INPUT_GITHUB_TOKEN, {
+    required: !disableCheck
+  })
+  const checkName = core.getInput(INPUT_NAME) || DEFAULT_CHECK_NAME
 
   const ctx = github.context
 
   try {
-    console.log('ctx', ctx)
-    const octokit = new Octokit({
-      auth: token
-    })
+    const octokit = await callIfDisabled(
+      disableCheck,
+      () =>
+        new Octokit({
+          auth: token
+        })
+    )
 
     const checkProps = {
       ...ctx.repo,
       head_sha: ctx.payload.after
     }
 
-    console.log('checkProps', checkProps)
-
-    const check = await octokit.rest.checks.create({
-      ...checkProps,
-      name: 'git-changes',
-      status: 'in_progress'
-    })
+    const check = await callIfDisabled(disableCheck, async () =>
+      octokit!.rest.checks.create({
+        ...checkProps,
+        name: checkName,
+        status: 'in_progress'
+      })
+    )
 
     try {
       const {files} = await diffIndex()
       if (files?.length === 0) {
-        const r = await octokit.rest.checks.update({
-          ...checkProps,
-          check_run_id: check.data.id,
-          conclusion: 'success',
-          output: {
-            title: 'No changes were found',
-            summary: 'The repository has no uncommitted changes.'
-          }
-        })
-        console.log('update files length 0 result', r)
+        await callIfDisabled(disableCheck, async () =>
+          octokit!.rest.checks.update({
+            ...checkProps,
+            check_run_id: check!.data.id,
+            conclusion: 'success',
+            output: {
+              title: 'No changes were found',
+              summary: 'The repository has no uncommitted changes.'
+            }
+          })
+        )
         return
       }
 
-      await octokit.rest.checks.update({
-        ...checkProps,
-        check_run_id: check.data.id,
-        conclusion: 'failure',
-        output: {
-          title: 'Uncommitted changes were found',
-          summary: `${(files ?? []).length} uncommitted files were found`,
-          text: `### Files
+      await callIfDisabled(disableCheck, async () =>
+        octokit!.rest.checks.update({
+          ...checkProps,
+          check_run_id: check!.data.id,
+          conclusion: 'failure',
+          output: {
+            title: 'Uncommitted changes were found',
+            summary: `${(files ?? []).length} uncommitted files were found`,
+            text: `### Files
 ${
   (files && files.length && files.map(f => `- ${f}`).join('\n')) ||
   '- No files found'
 }
 `
-        }
-      })
+          }
+        })
+      )
       console.log('Uncommited files found:')
       if (files && files.length) {
         for (const f of files) {
@@ -70,25 +94,26 @@ ${
     } catch (e) {
       process.exitCode = 1
       console.error(e)
-      const r = await octokit.rest.checks.update({
-        ...checkProps,
-        check_run_id: check.data.id,
-        conclusion: 'failure',
-        output: {
-          title: 'Check failed',
-          summary: 'An error occurred when running the action.',
-          text: `
-          ## Exception
-          ${e}
-          `
-        }
-      })
-      console.log('update error result', r)
+      await callIfDisabled(disableCheck, async () =>
+        octokit!.rest.checks.update({
+          ...checkProps,
+          check_run_id: check!.data.id,
+          conclusion: 'failure',
+          output: {
+            title: 'Check failed',
+            summary: 'An error occurred when running the action.',
+            text: `
+## Exception
+${e}
+`
+          }
+        })
+      )
       process.exitCode = 1
     }
   } catch (e: any) {
     process.exitCode = 1
-    console.log('error creating check')
+    console.log('error creating check:')
     console.error(e)
   }
 }

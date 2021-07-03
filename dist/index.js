@@ -36,7 +36,6 @@ function diffIndex() {
                 }
             }
         });
-        console.log(rawLines);
         const files = exports.splitFileNames(rawLines);
         return {
             files
@@ -86,37 +85,51 @@ const core = __importStar(__webpack_require__(2186));
 const github = __importStar(__webpack_require__(5438));
 const octokit_1 = __webpack_require__(7467);
 const git_1 = __webpack_require__(3374);
-const INPUT_GITHUB_TOKEN = 'github_token';
+const DEFAULT_CHECK_NAME = 'git-changes';
+const INPUT_GITHUB_TOKEN = 'github_token', INPUT_DISABLE_CHECK = 'disable_check', INPUT_NAME = 'name';
+const callIfDisabled = (enabled, f) => __awaiter(void 0, void 0, void 0, function* () {
+    if (!enabled) {
+        return f();
+    }
+    return undefined;
+});
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
-        const token = core.getInput(INPUT_GITHUB_TOKEN);
+        const disableCheck = core.getInput(INPUT_DISABLE_CHECK) === 'true';
+        const token = core.getInput(INPUT_GITHUB_TOKEN, {
+            required: !disableCheck
+        });
+        const checkName = core.getInput(INPUT_NAME) || DEFAULT_CHECK_NAME;
         const ctx = github.context;
         try {
-            console.log('ctx', ctx);
-            const octokit = new octokit_1.Octokit({
+            const octokit = yield callIfDisabled(disableCheck, () => new octokit_1.Octokit({
                 auth: token
-            });
+            }));
             const checkProps = Object.assign(Object.assign({}, ctx.repo), { head_sha: ctx.payload.after });
-            console.log('checkProps', checkProps);
-            const check = yield octokit.rest.checks.create(Object.assign(Object.assign({}, checkProps), { name: 'git-changes', status: 'in_progress' }));
+            const check = yield callIfDisabled(disableCheck, () => __awaiter(this, void 0, void 0, function* () {
+                return octokit.rest.checks.create(Object.assign(Object.assign({}, checkProps), { name: checkName, status: 'in_progress' }));
+            }));
             try {
                 const { files } = yield git_1.diffIndex();
                 if ((files === null || files === void 0 ? void 0 : files.length) === 0) {
-                    const r = yield octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'success', output: {
-                            title: 'No changes were found',
-                            summary: 'The repository has no uncommitted changes.'
-                        } }));
-                    console.log('update files length 0 result', r);
+                    yield callIfDisabled(disableCheck, () => __awaiter(this, void 0, void 0, function* () {
+                        return octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'success', output: {
+                                title: 'No changes were found',
+                                summary: 'The repository has no uncommitted changes.'
+                            } }));
+                    }));
                     return;
                 }
-                yield octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'failure', output: {
-                        title: 'Uncommitted changes were found',
-                        summary: `${(files !== null && files !== void 0 ? files : []).length} uncommitted files were found`,
-                        text: `### Files
+                yield callIfDisabled(disableCheck, () => __awaiter(this, void 0, void 0, function* () {
+                    return octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                            title: 'Uncommitted changes were found',
+                            summary: `${(files !== null && files !== void 0 ? files : []).length} uncommitted files were found`,
+                            text: `### Files
 ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
-                            '- No files found'}
+                                '- No files found'}
 `
-                    } }));
+                        } }));
+                }));
                 console.log('Uncommited files found:');
                 if (files && files.length) {
                     for (const f of files) {
@@ -128,21 +141,22 @@ ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
             catch (e) {
                 process.exitCode = 1;
                 console.error(e);
-                const r = yield octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'failure', output: {
-                        title: 'Check failed',
-                        summary: 'An error occurred when running the action.',
-                        text: `
-          ## Exception
-          ${e}
-          `
-                    } }));
-                console.log('update error result', r);
+                yield callIfDisabled(disableCheck, () => __awaiter(this, void 0, void 0, function* () {
+                    return octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                            title: 'Check failed',
+                            summary: 'An error occurred when running the action.',
+                            text: `
+## Exception
+${e}
+`
+                        } }));
+                }));
                 process.exitCode = 1;
             }
         }
         catch (e) {
             process.exitCode = 1;
-            console.log('error creating check');
+            console.log('error creating check:');
             console.error(e);
         }
     });
