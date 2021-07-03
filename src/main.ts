@@ -16,9 +16,15 @@ async function run(): Promise<void> {
       auth: token
     })
 
-    const check = await octokit.rest.checks.create({
+    const checkProps = {
       ...ctx.repo,
-      head_sha: ctx.payload.after,
+      head_sha: ctx.payload.after
+    }
+
+    console.log('checkProps', checkProps)
+
+    const check = await octokit.rest.checks.create({
+      ...checkProps,
       name: 'git-changes',
       status: 'in_progress'
     })
@@ -27,7 +33,7 @@ async function run(): Promise<void> {
       const {files} = await diffIndex()
       if (files?.length === 0) {
         const r = await octokit.rest.checks.update({
-          ...ctx.repo,
+          ...checkProps,
           check_run_id: check.data.id,
           conclusion: 'success',
           output: {
@@ -40,7 +46,7 @@ async function run(): Promise<void> {
       }
 
       await octokit.rest.checks.update({
-        ...ctx.repo,
+        ...checkProps,
         check_run_id: check.data.id,
         conclusion: 'failure',
         output: {
@@ -65,7 +71,7 @@ ${
       process.exitCode = 1
       console.error(e)
       const r = await octokit.rest.checks.update({
-        ...ctx.repo,
+        ...checkProps,
         check_run_id: check.data.id,
         conclusion: 'failure',
         output: {
@@ -82,7 +88,7 @@ ${
     }
   } catch (e: any) {
     process.exitCode = 1
-    process.stdout.write('error creating check\n')
+    console.log('error creating check')
     console.error(e)
   }
 }

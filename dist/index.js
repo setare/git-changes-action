@@ -96,18 +96,20 @@ function run() {
             const octokit = new octokit_1.Octokit({
                 auth: token
             });
-            const check = yield octokit.rest.checks.create(Object.assign(Object.assign({}, ctx.repo), { head_sha: ctx.sha, name: 'git-changes', status: 'in_progress' }));
+            const checkProps = Object.assign(Object.assign({}, ctx.repo), { head_sha: ctx.payload.after });
+            console.log('checkProps', checkProps);
+            const check = yield octokit.rest.checks.create(Object.assign(Object.assign({}, checkProps), { name: 'git-changes', status: 'in_progress' }));
             try {
                 const { files } = yield git_1.diffIndex();
                 if ((files === null || files === void 0 ? void 0 : files.length) === 0) {
-                    const r = yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'success', output: {
+                    const r = yield octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'success', output: {
                             title: 'No changes were found',
                             summary: 'The repository has no uncommitted changes.'
                         } }));
                     console.log('update files length 0 result', r);
                     return;
                 }
-                yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                yield octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'failure', output: {
                         title: 'Uncommitted changes were found',
                         summary: `${(files !== null && files !== void 0 ? files : []).length} uncommitted files were found`,
                         text: `### Files
@@ -126,7 +128,7 @@ ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
             catch (e) {
                 process.exitCode = 1;
                 console.error(e);
-                const r = yield octokit.rest.checks.update(Object.assign(Object.assign({}, ctx.repo), { check_run_id: check.data.id, conclusion: 'failure', output: {
+                const r = yield octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'failure', output: {
                         title: 'Check failed',
                         summary: 'An error occurred when running the action.',
                         text: `
@@ -140,7 +142,7 @@ ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
         }
         catch (e) {
             process.exitCode = 1;
-            process.stdout.write('error creating check\n');
+            console.log('error creating check');
             console.error(e);
         }
     });
