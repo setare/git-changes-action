@@ -18,7 +18,7 @@ async function run(): Promise<void> {
 
     const check = await octokit.rest.checks.create({
       ...ctx.repo,
-      head_sha: ctx.sha,
+      head_sha: ctx.payload.after,
       name: 'git-changes',
       status: 'in_progress'
     })
