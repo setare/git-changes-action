@@ -25,7 +25,7 @@ async function run(): Promise<void> {
     try {
       const {files} = await diffIndex()
       if (files?.length === 0) {
-        await octokit.rest.checks.update({
+        const r = await octokit.rest.checks.update({
           ...ctx.repo,
           check_run_id: check.data.id,
           conclusion: 'success',
@@ -34,10 +34,11 @@ async function run(): Promise<void> {
             summary: 'The repository has no uncommitted changes.'
           }
         })
+        console.log('update files length 0 result', r)
         return
       }
 
-      await octokit.rest.checks.update({
+      const r = await octokit.rest.checks.update({
         ...ctx.repo,
         check_run_id: check.data.id,
         conclusion: 'failure',
@@ -52,10 +53,11 @@ ${
 `
         }
       })
+      console.log('update files length != 0 result', r)
     } catch (e) {
       process.exitCode = 1
       console.error(e)
-      await octokit.rest.checks.update({
+      const r = await octokit.rest.checks.update({
         ...ctx.repo,
         check_run_id: check.data.id,
         conclusion: 'failure',
@@ -68,6 +70,7 @@ ${
           `
         }
       })
+      console.log('update error result', r)
       process.exitCode = 1
     }
   } catch (e: any) {
