@@ -1,12 +1,13 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import {Octokit} from 'octokit'
-import {diffIndex} from './git'
+import {diff, diffIndex} from './git'
 
 const DEFAULT_CHECK_NAME = 'git-changes'
 
 const INPUT_GITHUB_TOKEN = 'github_token',
   INPUT_DISABLE_CHECK = 'disable_check',
+  INPUT_DISABLE_DIFF = 'disable_diff',
   INPUT_NAME = 'name'
 
 const callIfDisabled = async <T>(
@@ -21,6 +22,7 @@ const callIfDisabled = async <T>(
 
 async function run(): Promise<void> {
   const disableCheck = core.getInput(INPUT_DISABLE_CHECK) === 'true'
+  const disableDiff = core.getInput(INPUT_DISABLE_DIFF) === 'true'
   const token = core.getInput(INPUT_GITHUB_TOKEN, {
     required: !disableCheck
   })
@@ -67,6 +69,19 @@ async function run(): Promise<void> {
         return
       }
 
+      let diffMarkdown = '',
+        diffRawContent = ''
+      if (!disableDiff) {
+        const {output} = await diff()
+        diffRawContent = output
+        diffMarkdown = `
+## Diff
+${'```'}diff
+${diffRawContent}
+${'```'}
+`
+      }
+
       await callIfDisabled(disableCheck, async () =>
         octokit!.rest.checks.update({
           ...checkProps,
@@ -80,7 +95,7 @@ ${
   (files && files.length && files.map(f => `- ${f}`).join('\n')) ||
   '- No files found'
 }
-`
+${diffMarkdown}`
           }
         })
       )
@@ -89,6 +104,11 @@ ${
         for (const f of files) {
           console.log(`- ${f}`)
         }
+      }
+      if (!disableDiff) {
+        console.log('')
+        console.log('Diff')
+        console.log(diffRawContent)
       }
       process.exitCode = 1
     } catch (e) {

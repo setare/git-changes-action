@@ -17,7 +17,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.diffIndex = exports.splitFileNames = void 0;
+exports.diff = exports.diffIndex = exports.splitFileNames = void 0;
 const exec_1 = __webpack_require__(1514);
 const splitFileNames = (lines) => {
     return lines.map(s => s.split('\t')[1]);
@@ -43,6 +43,26 @@ function diffIndex() {
     });
 }
 exports.diffIndex = diffIndex;
+function diff() {
+    return __awaiter(this, void 0, void 0, function* () {
+        let output = '';
+        yield exec_1.exec('git', ['--no-pager', 'diff'], {
+            ignoreReturnCode: true,
+            listeners: {
+                stdout: data => {
+                    output += data;
+                },
+                stderr: data => {
+                    output += data;
+                }
+            }
+        });
+        return {
+            output
+        };
+    });
+}
+exports.diff = diff;
 
 
 /***/ }),
@@ -86,7 +106,7 @@ const github = __importStar(__webpack_require__(5438));
 const octokit_1 = __webpack_require__(7467);
 const git_1 = __webpack_require__(3374);
 const DEFAULT_CHECK_NAME = 'git-changes';
-const INPUT_GITHUB_TOKEN = 'github_token', INPUT_DISABLE_CHECK = 'disable_check', INPUT_NAME = 'name';
+const INPUT_GITHUB_TOKEN = 'github_token', INPUT_DISABLE_CHECK = 'disable_check', INPUT_DISABLE_DIFF = 'disable_diff', INPUT_NAME = 'name';
 const callIfDisabled = (enabled, f) => __awaiter(void 0, void 0, void 0, function* () {
     if (!enabled) {
         return f();
@@ -96,6 +116,7 @@ const callIfDisabled = (enabled, f) => __awaiter(void 0, void 0, void 0, functio
 function run() {
     return __awaiter(this, void 0, void 0, function* () {
         const disableCheck = core.getInput(INPUT_DISABLE_CHECK) === 'true';
+        const disableDiff = core.getInput(INPUT_DISABLE_DIFF) === 'true';
         const token = core.getInput(INPUT_GITHUB_TOKEN, {
             required: !disableCheck
         });
@@ -120,6 +141,17 @@ function run() {
                     }));
                     return;
                 }
+                let diffMarkdown = '', diffRawContent = '';
+                if (!disableDiff) {
+                    const { output } = yield git_1.diff();
+                    diffRawContent = output;
+                    diffMarkdown = `
+## Diff
+${'```'}diff
+${diffRawContent}
+${'```'}
+`;
+                }
                 yield callIfDisabled(disableCheck, () => __awaiter(this, void 0, void 0, function* () {
                     return octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'failure', output: {
                             title: 'Uncommitted changes were found',
@@ -127,7 +159,7 @@ function run() {
                             text: `### Files
 ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
                                 '- No files found'}
-`
+${diffMarkdown}`
                         } }));
                 }));
                 console.log('Uncommited files found:');
@@ -135,6 +167,11 @@ ${(files && files.length && files.map(f => `- ${f}`).join('\n')) ||
                     for (const f of files) {
                         console.log(`- ${f}`);
                     }
+                }
+                if (!disableDiff) {
+                    console.log('');
+                    console.log('Diff');
+                    console.log(diffRawContent);
                 }
                 process.exitCode = 1;
             }
