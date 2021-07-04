@@ -1,7 +1,7 @@
 import * as core from '@actions/core'
 import * as github from '@actions/github'
 import {Octokit} from 'octokit'
-import {diff, diffIndex} from './git'
+import {diff, statusPorcelain} from './git'
 
 const DEFAULT_CHECK_NAME = 'git-changes'
 
@@ -53,7 +53,7 @@ async function run(): Promise<void> {
     )
 
     try {
-      const {files} = await diffIndex()
+      const {files} = await statusPorcelain()
       if (files?.length === 0) {
         await callIfDisabled(disableCheck, async () =>
           octokit!.rest.checks.update({
@@ -75,7 +75,7 @@ async function run(): Promise<void> {
         const {output} = await diff()
         diffRawContent = output
         diffMarkdown = `
-## Diff
+### Diff
 ${'```'}diff
 ${diffRawContent}
 ${'```'}

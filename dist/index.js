@@ -17,16 +17,16 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.diff = exports.diffIndex = exports.splitFileNames = void 0;
+exports.diff = exports.statusPorcelain = exports.splitFileNames = void 0;
 const exec_1 = __webpack_require__(1514);
 const splitFileNames = (lines) => {
-    return lines.map(s => s.split('\t')[1]);
+    return lines.map(s => s.substr(3));
 };
 exports.splitFileNames = splitFileNames;
-function diffIndex() {
+function statusPorcelain() {
     return __awaiter(this, void 0, void 0, function* () {
         const rawLines = [];
-        yield exec_1.exec('git', ['diff-index', 'HEAD', '--'], {
+        yield exec_1.exec('git', ['status', '--porcelain'], {
             listeners: {
                 stdline: data => {
                     rawLines.push(data);
@@ -42,7 +42,7 @@ function diffIndex() {
         };
     });
 }
-exports.diffIndex = diffIndex;
+exports.statusPorcelain = statusPorcelain;
 function diff() {
     return __awaiter(this, void 0, void 0, function* () {
         let output = '';
@@ -131,7 +131,7 @@ function run() {
                 return octokit.rest.checks.create(Object.assign(Object.assign({}, checkProps), { name: checkName, status: 'in_progress' }));
             }));
             try {
-                const { files } = yield git_1.diffIndex();
+                const { files } = yield git_1.statusPorcelain();
                 if ((files === null || files === void 0 ? void 0 : files.length) === 0) {
                     yield callIfDisabled(disableCheck, () => __awaiter(this, void 0, void 0, function* () {
                         return octokit.rest.checks.update(Object.assign(Object.assign({}, checkProps), { check_run_id: check.data.id, conclusion: 'success', output: {
@@ -146,7 +146,7 @@ function run() {
                     const { output } = yield git_1.diff();
                     diffRawContent = output;
                     diffMarkdown = `
-## Diff
+### Diff
 ${'```'}diff
 ${diffRawContent}
 ${'```'}

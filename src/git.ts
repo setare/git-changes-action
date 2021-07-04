@@ -1,17 +1,17 @@
 import {exec} from '@actions/exec'
 
 export const splitFileNames = (lines: string[]): string[] => {
-  return lines.map(s => s.split('\t')[1])
+  return lines.map(s => s.substr(3))
 }
 
 interface DiffIndexResponse {
   files?: string[]
 }
 
-export async function diffIndex(): Promise<DiffIndexResponse> {
+export async function statusPorcelain(): Promise<DiffIndexResponse> {
   const rawLines: string[] = []
 
-  await exec('git', ['diff-index', 'HEAD', '--'], {
+  await exec('git', ['status', '--porcelain'], {
     listeners: {
       stdline: data => {
         rawLines.push(data)
