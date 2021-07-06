@@ -5,6 +5,18 @@ inputs:
   github_token:
     required: true
     description: 'Github token to access checks'
+  disable_check:
+    required: false
+    description: 'Flag that disables the creation of checks'
+    default: 'false'
+  disable_diff:
+    required: false
+    description: 'Flag that disables the of a diff when uncommited changes are found.'
+    default: 'false'
+  name:
+    required: false
+    description: 'Name of the check'
+    default: 'git-checks'
 runs:
   using: 'node12'
   main: 'dist/index.js'
