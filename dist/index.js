@@ -114,6 +114,7 @@ const callIfDisabled = (enabled, f) => __awaiter(void 0, void 0, void 0, functio
     return undefined;
 });
 function run() {
+    var _a;
     return __awaiter(this, void 0, void 0, function* () {
         const disableCheck = core.getInput(INPUT_DISABLE_CHECK) === 'true';
         const disableDiff = core.getInput(INPUT_DISABLE_DIFF) === 'true';
@@ -126,7 +127,7 @@ function run() {
             const octokit = yield callIfDisabled(disableCheck, () => new octokit_1.Octokit({
                 auth: token
             }));
-            const checkProps = Object.assign(Object.assign({}, ctx.repo), { head_sha: ctx.payload.after });
+            const checkProps = Object.assign(Object.assign({}, ctx.repo), { head_sha: (_a = ctx.payload.after) !== null && _a !== void 0 ? _a : ctx.sha });
             const check = yield callIfDisabled(disableCheck, () => __awaiter(this, void 0, void 0, function* () {
                 return octokit.rest.checks.create(Object.assign(Object.assign({}, checkProps), { name: checkName, status: 'in_progress' }));
             }));
