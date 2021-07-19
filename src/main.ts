@@ -41,7 +41,7 @@ async function run(): Promise<void> {
 
     const checkProps = {
       ...ctx.repo,
-      head_sha: ctx.payload.after
+      head_sha: ctx.payload.after ?? ctx.sha
     }
 
     const check = await callIfDisabled(disableCheck, async () =>
